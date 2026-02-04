@@ -24,8 +24,6 @@ cd /opt/najah-delivery
 
 # Create docker-compose.yaml
 cat > docker-compose.yaml << 'EOF'
-version: '3.8'
-
 services:
   mongo:
     image: mongo:6.0
