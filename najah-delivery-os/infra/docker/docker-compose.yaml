@@ -1,0 +1,249 @@
+services:
+  mongo:
+    image: mongo:6.0
+    container_name: najah-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  express-api:
+    build:
+      context: ../../services/express-api
+      dockerfile: Dockerfile
+    container_name: najah-express-api
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../../.env
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - PORT=8080
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ../../services/auth
+      dockerfile: Dockerfile
+    container_name: najah-auth
+    ports:
+      - "8081:8081"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - PORT=8081
+      - JWT_SECRET=${JWT_SECRET:-default-jwt-secret-change-in-production}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  payments:
+    build:
+      context: ../../services/payments
+      dockerfile: Dockerfile
+    container_name: najah-payments
+    ports:
+      - "8082:8082"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - PORT=8082
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  ingestion:
+    build:
+      context: ../../services/ingestion
+      dockerfile: Dockerfile
+    container_name: najah-ingestion
+    ports:
+      - "8083:8083"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - PORT=8083
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  optimizer:
+    build:
+      context: ../../services/optimizer
+      dockerfile: Dockerfile
+    container_name: najah-optimizer
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=production
+      - PORT=5001
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  geocoding:
+    build:
+      context: ../../services/geocoding
+      dockerfile: Dockerfile
+    container_name: najah-geocoding
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=production
+      - PORT=5002
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  llm-assistant:
+    build:
+      context: ../../services/llm-assistant
+      dockerfile: Dockerfile
+    container_name: najah-llm-assistant
+    ports:
+      - "5003:5003"
+    volumes:
+      - chroma-data:/app/chroma_db
+    environment:
+      - FLASK_ENV=production
+      - PORT=5003
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - CHROMA_DB_PATH=/app/chroma_db
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+  merchant-portal:
+    build:
+      context: ../../services/merchant-portal
+      dockerfile: Dockerfile
+    container_name: najah-merchant-portal
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://express-api:8080
+      - NODE_ENV=production
+    depends_on:
+      - express-api
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: unless-stopped
+
+  driver-app:
+    build:
+      context: ../../services/driver-app
+      dockerfile: Dockerfile
+    container_name: najah-driver-app
+    ports:
+      - "3001:3001"
+    environment:
+      - REACT_APP_API_URL=http://express-api:8080
+      - NODE_ENV=production
+    depends_on:
+      - express-api
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    restart: unless-stopped
+
+  streamlit-admin:
+    build:
+      context: ../../services/streamlit-admin
+      dockerfile: Dockerfile
+    container_name: najah-streamlit-admin
+    ports:
+      - "8501:8501"
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - API_URL=http://express-api:8080
+    depends_on:
+      mongo:
+        condition: service_healthy
+      express-api:
+        condition: service_started
+    networks:
+      - najah-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+    restart: unless-stopped
+
+networks:
+  najah-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+    driver: local
+  chroma-data:
+    driver: local

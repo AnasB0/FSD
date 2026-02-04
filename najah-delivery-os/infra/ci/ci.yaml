@@ -1,0 +1,149 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - express-api
+          - auth
+          - payments
+          - ingestion
+          - optimizer
+          - geocoding
+          - llm-assistant
+          - merchant-portal
+          - driver-app
+          - streamlit-admin
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion", "merchant-portal", "driver-app"]'), matrix.service)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+
+      - name: Setup Python 3.11
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+
+      - name: Install Node.js dependencies
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion", "merchant-portal", "driver-app"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Install Python dependencies
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run Node.js tests
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: Run Python tests
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: pytest --cov --cov-report=xml
+        env:
+          PYTHONPATH: .
+
+      - name: Build React app
+        if: contains(fromJSON('["merchant-portal", "driver-app"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: npm run build
+        env:
+          CI: false
+          REACT_APP_API_URL: http://localhost:8080
+
+      - name: Upload coverage reports
+        if: success()
+        uses: codecov/codecov-action@v3
+        with:
+          files: services/${{ matrix.service }}/coverage.xml
+          flags: ${{ matrix.service }}
+          name: ${{ matrix.service }}-coverage
+          fail_ci_if_error: false
+
+  lint:
+    name: Lint ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - express-api
+          - auth
+          - payments
+          - ingestion
+          - optimizer
+          - geocoding
+          - llm-assistant
+          - merchant-portal
+          - driver-app
+          - streamlit-admin
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion", "merchant-portal", "driver-app"]'), matrix.service)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python 3.11
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Node.js dependencies
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion", "merchant-portal", "driver-app"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Install Python linting tools
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        run: pip install flake8 black isort
+
+      - name: Run ESLint
+        if: contains(fromJSON('["express-api", "auth", "payments", "ingestion", "merchant-portal", "driver-app"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: npm run lint || echo "No lint script defined"
+        continue-on-error: true
+
+      - name: Run Python linters
+        if: contains(fromJSON('["optimizer", "geocoding", "llm-assistant", "streamlit-admin"]'), matrix.service)
+        working-directory: services/${{ matrix.service }}
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
