@@ -1,0 +1,44 @@
+{
+  "name": "najah-ingestion-service",
+  "version": "1.0.0",
+  "description": "Webhook ingestion service for Najah Delivery OS - handles merchant webhooks with HMAC authentication",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "webhook",
+    "ingestion",
+    "delivery",
+    "hmac",
+    "authentication"
+  ],
+  "author": "Najah Delivery OS",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0",
+    "morgan": "^1.10.0",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "express-rate-limit": "^7.1.5",
+    "dotenv": "^16.3.1",
+    "crypto": "^1.0.1",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.55.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
