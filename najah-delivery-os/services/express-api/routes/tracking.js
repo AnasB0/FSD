@@ -126,7 +126,7 @@ router.get('/:orderId', async (req, res, next) => {
         name: order.customer.name,
         phone: order.customer.phone
       },
-      address: order.address.ar,
+      address: order.address?.ar || order.address,
       estimatedDeliveryTime: order.estimatedDeliveryTime,
       statusHistory: order.statusHistory.map(h => ({
         status: h.status,

@@ -149,7 +149,15 @@ router.post('/refresh', async (req, res, next) => {
       });
     }
 
-    const decoded = verifyToken(value.refreshToken, 'refresh');
+    let decoded;
+    try {
+      decoded = verifyToken(value.refreshToken, 'refresh');
+    } catch (tokenError) {
+      return res.status(401).json({
+        success: false,
+        message: req.language === 'ar' ? 'رمز منتهي الصلاحية أو غير صالح' : tokenError.message
+      });
+    }
     
     const session = await Session.findOne({
       refreshToken: value.refreshToken,
