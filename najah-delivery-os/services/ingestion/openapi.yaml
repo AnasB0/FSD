@@ -1,0 +1,343 @@
+openapi: 3.0.3
+info:
+  title: Najah Delivery - Ingestion/Webhooks API
+  description: |
+    Webhooks ingestion service for receiving orders from merchant systems.
+    All webhooks must include HMAC-SHA256 signature for authentication.
+  version: 1.0.0
+  contact:
+    name: Najah Delivery Team
+    email: support@najahdelivery.com
+
+servers:
+  - url: http://localhost:8083
+    description: Local development
+  - url: https://ingestion.najahdelivery.com
+    description: Production
+
+tags:
+  - name: webhooks
+    description: Webhook endpoints for merchant integrations
+  - name: health
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check service health and database connectivity
+      tags:
+        - health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                    description: Service uptime in seconds
+                  mongodb:
+                    type: string
+                    enum: [connected, disconnected]
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /webhooks/{merchantId}/orders:
+    post:
+      summary: Receive order webhook
+      description: |
+        Receive new order from merchant system. Requires valid HMAC-SHA256 signature.
+        
+        **Signature Generation:**
+        1. Serialize the request body as JSON string (no whitespace changes)
+        2. Compute HMAC-SHA256 using your webhook secret
+        3. Send the hex-encoded signature in `x-merchant-signature` header
+        
+        **Example (Node.js):**
+        ```javascript
+        const crypto = require('crypto');
+        const payload = JSON.stringify(orderData);
+        const signature = crypto.createHmac('sha256', webhookSecret)
+          .update(payload)
+          .digest('hex');
+        ```
+      tags:
+        - webhooks
+      parameters:
+        - name: merchantId
+          in: path
+          required: true
+          description: Merchant's unique identifier
+          schema:
+            type: string
+            format: objectid
+            example: 507f1f77bcf86cd799439011
+        - name: x-merchant-signature
+          in: header
+          required: true
+          description: HMAC-SHA256 signature of request body using webhook secret
+          schema:
+            type: string
+            example: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderWebhook'
+            examples:
+              basic:
+                summary: Basic order
+                value:
+                  externalOrderId: ORD-2024-001
+                  customerName: Ahmed Ali
+                  customerPhone: '+966501234567'
+                  address:
+                    ar: شارع الملك فهد، حي العليا، الرياض
+                    en: King Fahd Road, Olaya District, Riyadh
+                    components:
+                      street: King Fahd Road
+                      district: Olaya
+                      city: Riyadh
+                      postalCode: '12345'
+                    coordinates:
+                      lat: 24.7136
+                      lng: 46.6753
+                  items:
+                    - name: Pizza Margherita
+                      quantity: 2
+                      price: 45.00
+                      sku: PIZZA-001
+                  totalAmount: 90.00
+                  timeWindow:
+                    start: '2024-01-15T14:00:00Z'
+                    end: '2024-01-15T16:00:00Z'
+      responses:
+        '200':
+          description: Webhook received and processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                    example: true
+                  orderId:
+                    type: string
+                    format: objectid
+                    description: Internal order ID
+                    example: 507f191e810c19729de860ea
+                  webhookId:
+                    type: string
+                    format: uuid
+                    description: Webhook log ID for tracking
+                    example: 550e8400-e29b-41d4-a716-446655440000
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Invalid payload
+                  details:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message:
+                          type: string
+                        path:
+                          type: array
+                          items:
+                            type: string
+        '401':
+          description: Invalid or missing signature
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing:
+                  value:
+                    error: Missing x-merchant-signature header
+                invalid:
+                  value:
+                    error: Invalid signature
+        '403':
+          description: Merchant inactive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Merchant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    OrderWebhook:
+      type: object
+      required:
+        - externalOrderId
+        - customerName
+        - customerPhone
+        - address
+        - items
+        - totalAmount
+        - timeWindow
+      properties:
+        externalOrderId:
+          type: string
+          description: Merchant's order reference ID
+          example: ORD-2024-001
+        customerName:
+          type: string
+          description: Customer full name
+          example: Ahmed Ali
+        customerPhone:
+          type: string
+          description: Customer phone number (E.164 format recommended)
+          example: '+966501234567'
+        address:
+          type: object
+          required:
+            - ar
+            - en
+          properties:
+            ar:
+              type: string
+              description: Address in Arabic
+              example: شارع الملك فهد، حي العليا، الرياض
+            en:
+              type: string
+              description: Address in English
+              example: King Fahd Road, Olaya District, Riyadh
+            components:
+              type: object
+              description: Structured address components
+              properties:
+                street:
+                  type: string
+                district:
+                  type: string
+                city:
+                  type: string
+                postalCode:
+                  type: string
+            coordinates:
+              type: object
+              description: Geographic coordinates (if available)
+              properties:
+                lat:
+                  type: number
+                  format: double
+                  minimum: -90
+                  maximum: 90
+                lng:
+                  type: number
+                  format: double
+                  minimum: -180
+                  maximum: 180
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - name
+              - quantity
+              - price
+            properties:
+              name:
+                type: string
+                description: Item name
+                example: Pizza Margherita
+              quantity:
+                type: integer
+                minimum: 1
+                description: Item quantity
+                example: 2
+              price:
+                type: number
+                format: double
+                minimum: 0
+                description: Item unit price
+                example: 45.00
+              sku:
+                type: string
+                description: Item SKU or code
+                example: PIZZA-001
+        totalAmount:
+          type: number
+          format: double
+          minimum: 0
+          description: Total order amount
+          example: 90.00
+        timeWindow:
+          type: object
+          required:
+            - start
+            - end
+          properties:
+            start:
+              type: string
+              format: date-time
+              description: Delivery window start time
+              example: '2024-01-15T14:00:00Z'
+            end:
+              type: string
+              format: date-time
+              description: Delivery window end time
+              example: '2024-01-15T16:00:00Z'
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: Invalid signature
+
+  securitySchemes:
+    HmacSignature:
+      type: apiKey
+      in: header
+      name: x-merchant-signature
+      description: |
+        HMAC-SHA256 signature of the request body.
+        Computed using the merchant's webhook secret key.
+
+security:
+  - HmacSignature: []
