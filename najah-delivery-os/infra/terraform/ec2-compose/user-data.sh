@@ -34,7 +34,7 @@ services:
       - mongo-data:/data/db
     environment:
       - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=admin123
+      - MONGO_INITDB_ROOT_PASSWORD=${mongodb_password}
     restart: always
     deploy:
       resources:
@@ -48,7 +48,7 @@ services:
       - "8080:8080"
     environment:
       - NODE_ENV=production
-      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - MONGODB_URI=mongodb://admin:${mongodb_password}@mongo:27017/najah-delivery?authSource=admin
       - PORT=8080
     depends_on:
       - mongo
@@ -82,7 +82,7 @@ services:
     environment:
       - STREAMLIT_SERVER_PORT=8501
       - STREAMLIT_SERVER_ADDRESS=0.0.0.0
-      - MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+      - MONGODB_URI=mongodb://admin:${mongodb_password}@mongo:27017/najah-delivery?authSource=admin
       - API_URL=http://express-api:8080
     depends_on:
       - mongo
@@ -100,7 +100,7 @@ EOF
 # Create .env file
 cat > .env << EOF
 OPENROUTER_API_KEY=${openrouter_api_key}
-MONGODB_URI=mongodb://admin:admin123@mongo:27017/najah-delivery?authSource=admin
+MONGODB_URI=mongodb://admin:${mongodb_password}@mongo:27017/najah-delivery?authSource=admin
 NODE_ENV=production
 JWT_SECRET=$(openssl rand -base64 32)
 EOF

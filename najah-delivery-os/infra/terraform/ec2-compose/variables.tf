@@ -26,3 +26,16 @@ variable "openrouter_api_key" {
   type        = string
   sensitive   = true
 }
+
+variable "allowed_ssh_cidr_blocks" {
+  description = "CIDR blocks allowed to SSH into the instance. Restrict to your IP for production."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "mongodb_password" {
+  description = "Password for MongoDB admin user"
+  type        = string
+  sensitive   = true
+  default     = "admin123"
+}

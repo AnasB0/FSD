@@ -91,12 +91,12 @@ resource "aws_security_group" "najah_sg" {
   description = "Security group for Najah Delivery OS"
   vpc_id      = aws_vpc.main.id
 
-  # SSH
+  # SSH (restrict to your IP in production)
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ssh_cidr_blocks
     description = "SSH access"
   }
 
@@ -175,6 +175,7 @@ resource "aws_instance" "najah_delivery" {
 
   user_data = templatefile("${path.module}/user-data.sh", {
     openrouter_api_key = var.openrouter_api_key
+    mongodb_password   = var.mongodb_password
   })
 
   tags = {

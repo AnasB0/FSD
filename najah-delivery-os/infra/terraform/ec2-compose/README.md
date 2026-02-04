@@ -50,7 +50,18 @@ instance_type      = "t3.medium"
 key_name           = "najah-delivery-key"
 vpc_cidr           = "10.0.0.0/16"
 openrouter_api_key = "your-openrouter-api-key-here"
+
+# Security: Restrict SSH to your IP (replace with your actual IP)
+allowed_ssh_cidr_blocks = ["YOUR.IP.ADDRESS.HERE/32"]
+
+# Security: Use a strong MongoDB password (optional, defaults to 'admin123')
+mongodb_password = "your-strong-password-here"
 ```
+
+**Security Best Practices**:
+- Replace `YOUR.IP.ADDRESS.HERE` with your actual IP address (find it at https://whatismyip.com)
+- Use `allowed_ssh_cidr_blocks = ["0.0.0.0/0"]` only for testing (allows SSH from anywhere)
+- Generate a strong MongoDB password: `openssl rand -base64 32`
 
 **Important**: Never commit `terraform.tfvars` to version control as it contains sensitive data.
 
