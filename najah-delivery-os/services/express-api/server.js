@@ -61,7 +61,7 @@ app.use(i18n);
 // Database Connection
 // ============================================
 
-mongoose.connect(process.env.MONGO_URI || 'mongodb://mongo:27017/najah_delivery', {
+mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://mongo:27017/najah_delivery', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
